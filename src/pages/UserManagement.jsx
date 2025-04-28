@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Box, Paper, Typography, Button, CircularProgress, IconButton } from "@mui/material";
-import EditIcon from "@mui/icons-material/Edit";
+import { Box, Paper, Typography, CircularProgress } from "@mui/material";
 import UserModal from "../Modals/UserModal";
 import useApi from "../hooks/useApi";
 import GenericTable from "../components/GenericTable";
+import { getUserManagementColumns } from "../utils/userManagementColumns";
+import Button from "../components/Button"; // your custom button
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -14,6 +15,9 @@ const UserManagement = () => {
   const [selectedUserId, setSelectedUserId] = useState(null);
 
   const { request } = useApi();
+  
+  const userRole = JSON.parse(localStorage.getItem("user"))?.role || "USER";
+  const isReadOnly = userRole === "READONLY";
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -29,35 +33,43 @@ const UserManagement = () => {
         setLoading(false);
       }
     };
-
+  
     fetchUsers();
-  }, []);
-
-  const columns = [
-    { key: "firstName", label: "First Name", sx: { pl: 4 } },
-    { key: "lastName", label: "Last Name" },
-    { key: "email", label: "Email ID" },
-    { key: "role", label: "Roles" },
-    {
-      key: "lastLoggedIn",
-      label: "Last Login",
-      render: (row) => row.lastLoggedIn || "Not logged in Yet",
-    },
-  ];
-
-  const handleCreate = () => {
-    setSelectedUserId(null);
-    setOpenModal(true);
-  };
-
-  const handleEdit = (userId) => {
+  }, []); 
+  
+  const handleModalOpen = (userId = null) => {
     setSelectedUserId(userId);
     setOpenModal(true);
   };
 
-  const handleCloseModal = () => {
+  const handleModalClose = () => {
     setOpenModal(false);
     setSelectedUserId(null);
+  };
+
+  const columns = getUserManagementColumns(isReadOnly, handleModalOpen);
+
+  const renderTableContent = () => {
+    if (loading) {
+      return (
+        <Box display="flex" justifyContent="center" alignItems="center" py={5}>
+          <CircularProgress />
+        </Box>
+      );
+    }
+    return (
+      <GenericTable
+        columns={columns}
+        data={users}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        onPageChange={(e, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(e) => {
+          setRowsPerPage(parseInt(e.target.value, 10));
+          setPage(0);
+        }}
+      />
+    );
   };
 
   return (
@@ -68,50 +80,21 @@ const UserManagement = () => {
 
       <Paper elevation={3} sx={{ borderRadius: 3, p: 2 }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            sx={{
-              padding: "12px 20px",
-              borderRadius: "5px",
-              fontWeight: "bold",
-            }}
-            onClick={handleCreate}
-          >
-            Add New User
-          </Button>
+          {!isReadOnly && (
+            <Button
+              onClick={() => handleModalOpen()}
+              className="font-bold py-3 px-5 rounded-md"
+            >
+              Add New User
+            </Button>
+          )}
         </Box>
 
-        {loading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" py={5}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <GenericTable
-            columns={columns}
-            data={users}
-            page={page}
-            rowsPerPage={rowsPerPage}
-            onPageChange={(e, newPage) => setPage(newPage)}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-            renderActions={(row) => (
-              <IconButton
-                color="primary"
-                size="small"
-                onClick={() => handleEdit(row.id)}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-            )}
-          />
-        )}
+        {renderTableContent()}
       </Paper>
 
       {openModal && (
-        <UserModal onClose={handleCloseModal} id={selectedUserId} />
+        <UserModal onClose={handleModalClose} id={selectedUserId} />
       )}
     </Box>
   );

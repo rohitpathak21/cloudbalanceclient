@@ -1,32 +1,94 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Typography, Paper, Stack, Link } from "@mui/material";
-import CopyBlock from "../components/CopyBlock";
-import Input from "../components/Input";
+import { Box, Typography, Paper, Grid } from "@mui/material";
 import Button from "../components/Button";
+import Input from "../components/Input";
+import Step from "../components/onboarding/Step";
+import { onboardingPoliciesConfig, stepsConfig, onboardingCURConfig } from "../utils/OnboardingConfig";
+import useApi from "../hooks/useApi"; // Importing the useApi hook
 
 const Onboarding = () => {
-  const [roleArn, setRoleArn] = useState("");
+  const { request } = useApi(); // Initialize the hook
+  const [formData, setFormData] = useState({
+    roleArn: "",
+    accountHolderName: "",
+    accountId: "",
+    region: "",
+  });
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
 
   const handleBlur = () => {
     setTouched(true);
-    if (!roleArn.trim()) {
+    if (!formData.roleArn.trim()) {
       setError("Role ARN is required.");
     } else {
       setError("");
     }
   };
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+  };
+
   const handleNext = () => {
-    if (!roleArn.trim()) {
+    if (
+      currentPage === 1 &&
+      (!formData.roleArn.trim() ||
+        !formData.accountHolderName.trim() ||
+        !formData.accountId.trim() ||
+        !formData.region.trim())
+    ) {
       setTouched(true);
-      setError("Role ARN is required.");
+      setError("All fields are required.");
       return;
     }
-    navigate("/onboarding/policies", { state: { roleArn } });
+
+    if (currentPage === 1) {
+      setCurrentPage(2); // Move to page 2 (policy steps)
+    } else if (currentPage === 2) {
+      setCurrentPage(3); // Move to page 3 (CUR steps)
+    } else {
+      handleFinish(); // Call handleFinish on last page
+    }
+  };
+
+  const handleBack = () => {
+    if (currentPage === 3) {
+      setCurrentPage(2); // Move back to page 2 (policy steps)
+    } else {
+      setCurrentPage(1); // Move back to page 1 (initial steps)
+    }
+  };
+
+  // Handle API call when finishing the onboarding process
+  const handleFinish = async () => {
+    // Reformat the data to match the backend's expected structure
+    const payload = {
+      name: formData.accountHolderName,  // Use dynamic 'name' from form data
+      accountId: formData.accountId,
+      arn: formData.roleArn,
+      region: formData.region,  // Use dynamic 'region' from form data
+    };
+
+    try {
+      const response = await request({
+        method: "POST",
+        url: "/api/accounts",
+        data: payload, // Send the reformatted data to the API
+      });
+      console.log("API Response:", response);
+      navigate("/usermanagement"); // Navigate after successful API call
+    } catch (err) {
+      console.error("Error during API call:", err);
+      setError("An error occurred while creating the account. Please try again.");
+    }
   };
 
   return (
@@ -53,19 +115,97 @@ const Onboarding = () => {
           padding: 4,
         }}
       >
-        {/* Steps 1-6 */}
-        {[...Array(6)].map((_, index) => (
-          <Box key={index} mt={index === 0 ? 0 : 4}>
-            <StepContent
-              step={index + 1}
-              roleArn={roleArn}
-              setRoleArn={setRoleArn}
-              handleBlur={handleBlur}
-              touched={touched}
-              error={error}
-            />
-          </Box>
-        ))}
+        {/* Page 1: Initial steps */}
+        {currentPage === 1 &&
+          stepsConfig.slice(0, 6).map((step) => (
+            <Box key={step.stepNumber} mb={4}>
+              <Step {...step} />
+              {step.stepNumber === 6 && (
+                <Grid container spacing={3} sx={{ mt: 2 }}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Input
+                      name="roleArn"
+                      label="Role ARN"
+                      value={formData.roleArn}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      touched={touched}
+                      error={error}
+                      placeholder="arn:aws:iam::123456789012:role/your-role-name"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Input
+                      name="accountHolderName"
+                      label="Account Holder Name"
+                      value={formData.accountHolderName}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      touched={touched}
+                      error={error}
+                      placeholder="John Doe"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Input
+                      name="accountId"
+                      label="Account ID"
+                      value={formData.accountId}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      touched={touched}
+                      error={error}
+                      placeholder="123456789012"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Input
+                      name="region"
+                      label="Region"
+                      value={formData.region}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      touched={touched}
+                      error={error}
+                      placeholder="us-west-2"
+                    />
+                  </Grid>
+                </Grid>
+              )}
+            </Box>
+          ))}
+
+        {/* Page 2: Policy steps mapped from config */}
+        {currentPage === 2 &&
+          onboardingPoliciesConfig.map((step) => (
+            <Box key={step.stepNumber} mb={4}>
+              <Step
+                stepNumber={step.stepNumber}
+                content={step.content}
+                image={step.image}
+                imageDimensions={step.imageDimensions}
+                copyContent={step.copyContent}
+                copyDimensions={step.copyDimensions}
+                copyButtonPosition={step.copyButtonPosition}
+              />
+            </Box>
+          ))}
+
+        {/* Page 3: Onboarding CUR steps mapped from config */}
+        {currentPage === 3 &&
+          onboardingCURConfig.map((step) => (
+            <Box key={step.stepNumber} mb={4}>
+              <Step
+                stepNumber={step.stepNumber}
+                content={step.content}
+                image={step.image}
+                imageDimensions={step.imageDimensions}
+                copyContent={step.copyContent}
+                copyDimensions={step.copyDimensions}
+                copyButtonPosition={step.copyButtonPosition}
+              />
+            </Box>
+          ))}
       </Paper>
 
       <Box
@@ -80,171 +220,26 @@ const Onboarding = () => {
         >
           Cancel
         </button>
-        <Button onClick={handleNext}>
-          Next - Add Customer Managed Policies
-        </Button>
+        <Box>
+          {currentPage > 1 && (
+            <button
+              onClick={handleBack}
+              className="border border-gray-500 text-gray-500 bg-white px-4 py-2 rounded-md hover:bg-gray-50 transition mr-4"
+            >
+              Back
+            </button>
+          )}
+          <Button onClick={handleNext}>
+            {currentPage === 1
+              ? "Next - Add Customer Managed Policies"
+              : currentPage === 2
+              ? "Next - Cost and Usage Report"
+              : "Finish"}
+          </Button>
+        </Box>
       </Box>
     </Box>
   );
-};
-
-const StepNumber = ({ number }) => (
-  <Box
-    sx={{
-      width: 32,
-      height: 32,
-      borderRadius: "50%",
-      backgroundColor: "#e0e0e0",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      fontWeight: "bold",
-    }}
-  >
-    {number}
-  </Box>
-);
-
-const StepContent = ({
-  step,
-  roleArn,
-  setRoleArn,
-  handleBlur,
-  touched,
-  error,
-}) => {
-  switch (step) {
-    case 1:
-      return (
-        <Stack direction="row" alignItems="flex-start" spacing={2}>
-          <StepNumber number={1} />
-          <Typography variant="body1">
-            Log into AWS account and{" "}
-            <Link
-              href="#"
-              underline="always"
-              sx={{ color: "blue", fontWeight: 500 }}
-            >
-              create an IAM Role
-            </Link>
-          </Typography>
-        </Stack>
-      );
-    case 2:
-      return (
-        <Stack direction="row" alignItems="flex-start" spacing={2}>
-          <StepNumber number={2} />
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="body1" mb={1}>
-              In the <span className="italic">Trusted entity type section</span>
-              , select{" "}
-              <span className="font-semibold">Custom trust policy</span>.
-              Replace the prefilled policy with the policy provided below -
-            </Typography>
-            <CopyBlock
-              content={`{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "ec2.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}`}
-              height="250px"
-              width="100%"
-              buttonPosition="top-right"
-            />
-          </Box>
-        </Stack>
-      );
-    case 3:
-      return (
-        <Stack direction="row" alignItems="flex-start" spacing={2}>
-          <StepNumber number={3} />
-          <Typography variant="body1">
-            Click on <span className="font-semibold">Next</span> to go to the{" "}
-            <span className="italic">Add permissions page.</span> We would not
-            be adding any permissions for now because the permission policy
-            content will be dependent on the AWS Account ID retrieved from the
-            IAM Role. Click on <span className="font-semibold">Next.</span>
-          </Typography>
-        </Stack>
-      );
-    case 4:
-      return (
-        <Stack direction="row" alignItems="flex-start" spacing={2}>
-          <StepNumber number={4} />
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="body1" mb={1}>
-              In the <span className="italic">Role name field</span>, enter the
-              below-mentioned role name, and click on{" "}
-              <span className="font-semibold">Create Role</span>
-            </Typography>
-            <CopyBlock
-              content="CK-Tuner-role-dev-2"
-              height="55px"
-              width="270px"
-              buttonPosition="right"
-            />
-          </Box>
-        </Stack>
-      );
-    case 5:
-      return (
-        <Stack direction="row" alignItems="flex-start" spacing={2}>
-          <StepNumber number={5} />
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="body1" mb={2}>
-              Go to the newly created IAM role and copy the role ARN.
-            </Typography>
-            <Box
-              sx={{
-                width: "100%",
-                height: 300,
-                backgroundColor: "#e0e0e0",
-                borderRadius: 2,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                color: "#757575",
-                fontSize: 16,
-              }}
-            >
-              Placeholder for screenshot/image
-            </Box>
-          </Box>
-        </Stack>
-      );
-    case 6:
-      return (
-        <Stack direction="row" alignItems="flex-start" spacing={2}>
-          <StepNumber number={6} />
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="body1" mb={2}>
-              Paste the copied Role ARN below -
-            </Typography>
-            <Box sx={{ width: "40%" }}>
-              <Input
-                name="roleArn"
-                label="Role ARN"
-                value={roleArn}
-                onChange={(e) => setRoleArn(e.target.value)}
-                onBlur={handleBlur}
-                touched={touched}
-                error={error}
-                placeholder="arn:aws:iam::123456789012:role/your-role-name"
-              />
-            </Box>
-          </Box>
-        </Stack>
-      );
-    default:
-      return null;
-  }
 };
 
 export default Onboarding;

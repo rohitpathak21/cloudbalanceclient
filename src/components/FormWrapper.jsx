@@ -11,6 +11,7 @@ const FormWrapper = ({
   loadingText,
   extraContent,
   onFieldChange,
+  formValues,
 }) => {
   const [formData, setFormData] = useState(
     Object.fromEntries(formFields.map((field) => [field.name, ""]))
@@ -19,14 +20,17 @@ const FormWrapper = ({
   const [touched, setTouched] = useState({});
 
   useEffect(() => {
-    if (formData.role) {
-      onFieldChange("role", formData.role);
+    if (formValues) {
+      setFormData(formValues);
     }
-  }, [formData.role, onFieldChange]);
+  }, [formValues]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // 🔥 Call parent's onFieldChange only when user actually types
+    onFieldChange(name, value);
 
     setErrors((prev) => ({
       ...prev,
@@ -74,7 +78,7 @@ const FormWrapper = ({
           name={field.name}
           label={field.label}
           type={field.type}
-          value={formData[field.name]}
+          value={formData[field.name] || ""}
           onChange={handleChange}
           onBlur={handleBlur}
           error={errors[field.name]}

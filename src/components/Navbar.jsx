@@ -13,6 +13,17 @@ const Navbar = ({ toggleSidebar }) => {
   const fullName = currentUser
     ? `${currentUser.firstName} ${currentUser.lastName}`
     : "Guest";
+  
+  const role = currentUser?.role;
+
+  // Redirect based on user role when logo is clicked
+  const handleLogoClick = () => {
+    if (role === "ADMIN" || role === "READONLY") {
+      navigate("/usermanagement");
+    } else if (role === "CUSTOMER") {
+      navigate("/costexplorer");
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -34,7 +45,7 @@ const Navbar = ({ toggleSidebar }) => {
   return (
     <div className="fixed top-0 left-0 right-0 h-20 bg-white text-blue-700 shadow-lg flex z-50">
       {/* Left: Logo */}
-      <div className="w-[240px] flex items-center justify-center">
+      <div className="w-[240px] flex items-center justify-center cursor-pointer" onClick={handleLogoClick}>
         <img src="/image.png" alt="Logo" className="h-12 object-contain" />
       </div>
 
@@ -42,7 +53,7 @@ const Navbar = ({ toggleSidebar }) => {
       <div className="flex flex-1 items-center justify-between px-8">
         <button
           onClick={toggleSidebar}
-          className="text-blue-700 text-2xl focus:outline-none"
+          className="text-blue-700 text-2xl focus:outline-none cursor-pointer"
         >
           <FaBars />
         </button>

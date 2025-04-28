@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Tabs,
@@ -11,32 +11,68 @@ import {
   TextField,
   Paper,
 } from "@mui/material";
+import useApi from "../hooks/useApi"; // Import the useApi hook
 import GenericTable from "../components/GenericTable";
-
-const accounts = ["Account 1", "Account 2", "Account 3"];
-
-const allData = {
-  EC2: [
-    { id: "i-123456", name: "Web Server", region: "us-east-1", status: "running" },
-    { id: "i-789012", name: "DB Server", region: "us-west-1", status: "stopped" },
-    { id: "i-141516", name: "Dev Machine", region: "eu-central-1", status: "terminated" },
-  ],
-  RDS: [
-    { id: "db-001", name: "UserDB", region: "us-east-1", status: "available" },
-    { id: "db-002", name: "OrdersDB", region: "us-west-2", status: "modifying" },
-  ],
-  ASG: [
-    { id: "asg-01", name: "ASG-Frontend", region: "us-west-1", status: "Active" },
-    { id: "asg-02", name: "ASG-Backend", region: "us-east-1", status: "Updating" },
-  ],
-};
 
 const AWSservices = () => {
   const [selectedTab, setSelectedTab] = useState("EC2");
-  const [selectedAccount, setSelectedAccount] = useState(accounts[0]);
+  const [selectedAccount, setSelectedAccount] = useState("");
+  const [accounts, setAccounts] = useState([]);  // To store the accounts
   const [filters, setFilters] = useState({ id: "", name: "", region: "", status: "" });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [data, setData] = useState([]);  // To store the fetched data
+  const { request } = useApi();  // Initialize the API hook
+
+  // Function to fetch the accounts from the API
+  const fetchAccounts = async () => {
+    try {
+      const response = await request({
+        method: "GET",
+        url: "/api/accounts/all",
+      });
+      setAccounts(response);  // Update the accounts state with the fetched data
+      if (response.length > 0) {
+        setSelectedAccount(response[0].accountId);  // Set the default account
+      }
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+    }
+  };
+
+  // Function to fetch data based on tab and account
+  const fetchData = async () => {
+    try {
+      let url = "";
+      if (selectedTab === "EC2") {
+        url = `/aws/ec2?accountId=${selectedAccount}`;
+      } else if (selectedTab === "RDS") {
+        url = `/aws/rds?accountId=${selectedAccount}`;
+      } else if (selectedTab === "ASG") {
+        url = `/aws/asg?accountId=${selectedAccount}`;
+      }
+
+      const response = await request({
+        method: "GET",
+        url: url,
+      });
+
+      // Set the response data into state
+      setData(response);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAccounts();  // Fetch accounts when the component mounts
+  }, []);
+
+  useEffect(() => {
+    if (selectedAccount) {
+      fetchData(); // Fetch data when selected tab or account changes
+    }
+  }, [selectedTab, selectedAccount]);
 
   const handleTabChange = (_, newValue) => {
     setSelectedTab(newValue);
@@ -58,7 +94,8 @@ const AWSservices = () => {
     { key: "status", label: "Status", render: null },
   ];
 
-  const filteredData = allData[selectedTab].filter((row) => {
+  // Filter data based on the filters state
+  const filteredData = data.filter((row) => {
     return Object.entries(filters).every(([key, value]) =>
       row[key].toLowerCase().includes(value.toLowerCase())
     );
@@ -106,8 +143,8 @@ const AWSservices = () => {
           <InputLabel>Account</InputLabel>
           <Select value={selectedAccount} onChange={handleAccountChange} label="Account">
             {accounts.map((acc, idx) => (
-              <MenuItem key={idx} value={acc}>
-                {acc}
+              <MenuItem key={idx} value={acc.accountId}>
+                {acc.name}
               </MenuItem>
             ))}
           </Select>

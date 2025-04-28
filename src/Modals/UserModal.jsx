@@ -1,21 +1,14 @@
 import React, { useState, useEffect } from "react";
 import GenericModal from "../Modals/GenericModal";
 import { createUserFormConfig } from "../utils/Config";
-import {
-  validateEmail,
-  validatePassword,
-  validateName,
-  validateRole,
-} from "../utils/validator";
+import { validateEmail, validatePassword, validateName, validateRole } from "../utils/validator";
 import { toast } from "react-toastify";
 import AccountAssignment from "../components/AccountAssignment";
 import useApi from "../hooks/useApi";
-import Input from "../components/Input";
-import Button from "../components/Button";
+import FormWrapper from "../components/FormWrapper"; // import the FormWrapper
 
 const UserModal = ({ onClose, id = null }) => {
   const isEditMode = Boolean(id);
-
   const [assignedAccounts, setAssignedAccounts] = useState([]);
   const [searchUnassigned, setSearchUnassigned] = useState("");
   const [searchAssigned, setSearchAssigned] = useState("");
@@ -25,10 +18,8 @@ const UserModal = ({ onClose, id = null }) => {
   const [formValues, setFormValues] = useState({});
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-
   const { request } = useApi();
 
-  // Fetch all accounts (used in AccountAssignment)
   useEffect(() => {
     const fetchAllAccounts = async () => {
       if (selectedRole !== "CUSTOMER") return;
@@ -47,7 +38,6 @@ const UserModal = ({ onClose, id = null }) => {
     fetchAllAccounts();
   }, [selectedRole]);
 
-  // Fetch user + assigned accounts in edit mode
   useEffect(() => {
     const fetchUserAndAccounts = async () => {
       if (!isEditMode) {
@@ -61,21 +51,19 @@ const UserModal = ({ onClose, id = null }) => {
       }
 
       try {
-        // 1. Fetch user details
         const userData = await request({ method: "GET", url: `/api/users/${id}` });
 
         const initial = {
           firstName: userData.firstName || "",
           lastName: userData.lastName || "",
           email: userData.email || "",
-          password: "", // always empty in edit mode
+          password: "", 
           role: userData.role || "",
         };
 
         setFormValues(initial);
         setSelectedRole(userData.role || "");
 
-        // 2. Fetch assigned accounts if CUSTOMER
         if (userData.role === "CUSTOMER") {
           const assignedData = await request({
             method: "GET",
@@ -122,15 +110,13 @@ const UserModal = ({ onClose, id = null }) => {
     setErrors((prev) => ({ ...prev, [name]: error }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const handleSubmit = async (formData) => {
     const newErrors = {};
     const newTouched = {};
     let hasError = false;
 
     createUserFormConfig.forEach((field) => {
-      const value = formValues[field.name];
+      const value = formData[field.name];
       const error = validateFields(field.name, value);
       newTouched[field.name] = true;
 
@@ -147,8 +133,8 @@ const UserModal = ({ onClose, id = null }) => {
 
     const finalData =
       selectedRole === "CUSTOMER"
-        ? { ...formValues, accountIds: assignedAccounts }
-        : formValues;
+        ? { ...formData, accountIds: assignedAccounts }
+        : formData;
 
     try {
       if (isEditMode) {
@@ -169,78 +155,22 @@ const UserModal = ({ onClose, id = null }) => {
     }
   };
 
-  const renderForm = () => (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {createUserFormConfig.map((field) => {
-          if (isEditMode && field.name === "password") {
-            return (
-              <Input
-                key={field.name}
-                name={field.name}
-                label={field.label}
-                type={field.type}
-                value={formValues[field.name] ?? ""}
-                onChange={(e) => handleChange(field.name, e.target.value)}
-                error={errors[field.name]}
-                touched={touched[field.name]}
-                placeholder={
-                  field.placeholder || `Enter ${field.label.toLowerCase()}`
-                }
-                options={field.options}
-                showToggle={field.type === "password"}
-                className="px-2 py-1"
-              />
-            );
-          }
-          return (
-            <Input
-              key={field.name}
-              name={field.name}
-              label={field.label}
-              type={field.type}
-              value={formValues[field.name] ?? ""}
-              onChange={(e) => handleChange(field.name, e.target.value)}
-              error={errors[field.name]}
-              touched={touched[field.name]}
-              placeholder={
-                field.placeholder || `Enter ${field.label.toLowerCase()}`
-              }
-              options={field.options}
-              showToggle={field.type === "password"}
-              className="px-2 py-1"
-            />
-          );
-        })}
-      </div>
-
-      {selectedRole === "CUSTOMER" && (
-        <div className="mt-2">
-          {loadingAccounts ? (
-            <p className="text-gray-500 text-center">Loading accounts...</p>
-          ) : (
-            <AccountAssignment
-              dummyAccounts={accounts}
-              assignedAccounts={assignedAccounts}
-              setAssignedAccounts={setAssignedAccounts}
-              searchUnassigned={searchUnassigned}
-              setSearchUnassigned={setSearchUnassigned}
-              searchAssigned={searchAssigned}
-              setSearchAssigned={setSearchAssigned}
-            />
-          )}
-        </div>
+  const extraContent = selectedRole === "CUSTOMER" && (
+    <div className="mt-2">
+      {loadingAccounts ? (
+        <p className="text-gray-500 text-center">Loading accounts...</p>
+      ) : (
+        <AccountAssignment
+          dummyAccounts={accounts}
+          assignedAccounts={assignedAccounts}
+          setAssignedAccounts={setAssignedAccounts}
+          searchUnassigned={searchUnassigned}
+          setSearchUnassigned={setSearchUnassigned}
+          searchAssigned={searchAssigned}
+          setSearchAssigned={setSearchAssigned}
+        />
       )}
-
-      <div className="flex justify-end mt-4">
-        <Button
-          type="submit"
-          className="bg-blue-600 hover:bg-blue-700 px-6 py-3 text-white"
-        >
-          {isEditMode ? "Update User" : "Create User"}
-        </Button>
-      </div>
-    </form>
+    </div>
   );
 
   return (
@@ -248,7 +178,19 @@ const UserModal = ({ onClose, id = null }) => {
       isOpen={true}
       onClose={onClose}
       title={isEditMode ? "Edit User" : "Create New User"}
-      body={renderForm()}
+      body={
+        <FormWrapper
+          formFields={createUserFormConfig}
+          formValues= {formValues}
+          buttonText={isEditMode ? "Update User" : "Create User"}
+          onSubmit={handleSubmit}
+          validateField={validateFields}
+          disabled={false}
+          loadingText={loadingAccounts ? "Saving..." : ""}
+          extraContent={extraContent}
+          onFieldChange={handleChange}
+        />
+      }
       sx={{ width: "600px" }}
     />
   );

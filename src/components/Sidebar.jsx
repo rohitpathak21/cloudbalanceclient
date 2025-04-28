@@ -7,8 +7,8 @@ import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 
 // Role-based permissions configuration
 const rolePermissions = {
-  ADMIN: ["*", "/usermanagement", "/onboarding", "/onboarding/policies", "/onboarding/cur", "/costexplorer", "/awsservices"],
-  READONLY: ["/usermanagement", "/costexplorer", "/awsservices", "/onboarding/cur", "/onboarding/policies"],
+  ADMIN: ["*", "/usermanagement", "/onboarding","/costexplorer", "/awsservices"],
+  READONLY: ["/usermanagement", "/costexplorer", "/awsservices"],
   CUSTOMER: ["/awsservices", "/costexplorer"],
 };
 
